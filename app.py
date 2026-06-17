@@ -1,14 +1,11 @@
 import streamlit as st
-from PIL import Image
 import utils
-import random
 
-# Configuración inicial
 st.set_page_config(page_title="Pokémon AI Game", page_icon="🎮", layout="centered")
 st.title("🎮 Humano vs. IA: El Desafío Pokémon")
-st.write("¡Demostrá que sabés más de tipos que nuestra ResNet18 entrenada!")
+st.write("¡Competí contra la ResNet18! ¿Quién descubrirá el tipo verdadero primero?")
 
-# 1. Carga del modelo (Cacheada)
+# 1. Carga del modelo
 RUTA_MEJOR_MODELO = "best_model.pt"
 
 @st.cache_resource
@@ -20,122 +17,138 @@ if not carga_exitosa:
     st.error(mensaje)
     st.stop()
 
-# 2. Inicializar el Estado del Juego (Session State)
-# Esto evita que los puntajes y la imagen cambien cada vez que tocás un botón
+# 2. Inicializar el Estado del Juego
 if 'puntaje_humano' not in st.session_state:
     st.session_state.puntaje_humano = 0
 if 'puntaje_ia' not in st.session_state:
     st.session_state.puntaje_ia = 0
-if 'juego_evaluado' not in st.session_state:
-    st.session_state.juego_evaluado = False
-if 'pred_idx' not in st.session_state:
+
+# Variables del turno actual
+if 'pkmn_nombre' not in st.session_state:
+    # Cargar el primer Pokémon al iniciar la app
+    nombre, tipo, img = utils.obtener_pokemon_aleatorio()
+    st.session_state.pkmn_nombre = nombre
+    st.session_state.pkmn_tipo_real = tipo
+    st.session_state.pkmn_imagen = img
+    st.session_state.turno_evaluado = False
     st.session_state.pred_idx = None
     st.session_state.probabilidades = None
-    st.session_state.clases = None
 
-# --- SEPARACIÓN EN SECCIONES (TABS) ---
-tab_juego, tab_analisis = st.tabs(["🎮 ¡A Jugar!", "📊 Laboratorio del Profesor Oak (Análisis)"])
+# Función para pasar al siguiente turno
+def siguiente_turno():
+    nombre, tipo, img = utils.obtener_pokemon_aleatorio()
+    st.session_state.pkmn_nombre = nombre
+    st.session_state.pkmn_tipo_real = tipo
+    st.session_state.pkmn_imagen = img
+    st.session_state.turno_evaluado = False
+    st.session_state.pred_idx = None
+    st.session_state.probabilidades = None
+
+# --- ESTRUCTURA DE TABS ---
+tab_juego, tab_analisis = st.tabs(["🎮 ¡A Jugar!", "📊 Laboratorio de Probabilidades"])
 
 # ==============================================================================
-# TAB 1: EL JUEGO INTERACTIVO
+# TAB 1: EL CAMPO DE BATALLA
 # ==============================================================================
 with tab_juego:
-    st.subheader("Subí una imagen misteriosa para desafiar a la máquina")
-    
-    # El usuario sube la imagen (puede ser un caso esperado o un caso límite capcioso)
-    uploaded_file = st.file_uploader("Arrastrá el Pokémon aquí...", type=["jpg", "jpeg", "png"], key="game_upload")
-    
-    if uploaded_file is not None:
-        imagen = Image.open(uploaded_file).convert("RGB")
-        
-        # Mostrar imagen en el campo de batalla
-        col_img, col_vs = st.columns([2, 1])
-        with col_img:
-            st.image(imagen, caption='Objetivo a clasificar', width=300)
-        
-        with col_vs:
-            st.metric("Tu Puntaje", st.session_state.puntaje_humano)
-            st.metric("Puntaje IA", st.session_state.puntaje_ia)
-            
-            # Botón para reiniciar el tablero de puntos si quieren jugar otra ronda
-            if st.button("🔄 Reiniciar Marcador"):
-                st.session_state.puntaje_humano = 0
-                st.session_state.puntaje_ia = 0
-                st.rerun()
+    # Fila superior: Marcadores y Control
+    col_score1, col_score2, col_btn = st.columns([1, 1, 1.5])
+    with col_score1:
+        st.metric("🏆 Tu Puntaje", st.session_state.puntaje_humano)
+    with col_score2:
+        st.metric("🤖 Puntaje IA", st.session_state.puntaje_ia)
+    with col_btn:
+        st.write("") # Espacio estético
+        if st.button("⏭️ Siguiente Pokémon", use_container_width=True):
+            siguiente_turno()
+            st.rerun()
 
-        st.write("---")
-        st.markdown("### 🎯 ¡Hacé tu apuesta!")
-        
-        # El usuario elige qué tipo cree que es
-        opcion_usuario = st.selectbox("¿De qué tipo principal es este Pokémon?", utils.CLASSES)
-        
-        # Botón para gatillar el veredicto
-        if st.button("⚔️ Revelar Resultados"):
-            # Procesar predicción de la IA
-            with st.spinner("La IA está analizando los píxeles..."):
-                pred_idx, probabilidades, clases = utils.predecir_imagen(modelo, imagen)
+    st.write("---")
+    
+    # Mostrar la imagen del rival misterioso
+    st.subheader(f"¿Quién es este Pokémon?")
+    st.image(st.session_state.pkmn_imagen, width=280)
+    
+    # Selección de respuesta del jugador
+    # Deshabilitamos el selector si ya se evaluó para evitar trampas en el mismo turno
+    opcion_usuario = st.selectbox(
+        "Elegí el tipo principal:", 
+        utils.CLASSES, 
+        disabled=st.session_state.turno_evaluado
+    )
+    
+    # Botón de acción principal
+    if not st.session_state.turno_evaluado:
+        if st.button("⚔️ Enviar Apuesta", type="primary", use_container_width=True):
             
-            # Guardar en session_state para que la pestaña de análisis pueda leerlo
+            # Ejecutar inferencia con la ResNet18
+            pred_idx, probabilidades, clases = utils.predecir_imagen(modelo, st.session_state.pkmn_imagen)
+            
+            # Guardar datos en el estado
             st.session_state.pred_idx = pred_idx
             st.session_state.probabilidades = probabilidades
-            st.session_state.clases = clases
-            st.session_state.juego_evaluado = True
+            st.session_state.turno_evaluado = True
             
-            clase_predicha_ia = clases[pred_idx]
-            confianza_ia = probabilidades[pred_idx].item() * 100
+            clase_ia = clases[pred_idx]
+            tipo_correcto = st.session_state.pkmn_tipo_real
             
-            st.write("### 📢 Veredicto Final:")
+            st.write("---")
+            st.markdown(f"## 📢 ¡Resultados para **{st.session_state.pkmn_nombre}**!")
             
-            # Lógica de puntos
-            # Nota para la defensa: Aquí asumimos que el usuario dice la verdad, 
-            # o pueden validar si la IA y el Humano coinciden.
-            col1, col2 = st.columns(2)
-            with col1:
-                st.info(f"**Tu respuesta:** {opcion_usuario}")
-            with col2:
-                st.warning(f"**Respuesta de la IA:** {clase_predicha_ia} ({confianza_ia:.1f}% de confianza)")
+            col_u, col_ia, col_real = st.columns(3)
+            with col_u:
+                st.info(f"**Tu respuesta:**\n\n{opcion_usuario}")
+            with col_ia:
+                st.warning(f"**Inferencia IA:**\n\n{clase_ia}")
+            with col_real:
+                st.success(f"**Tipo Real (API):**\n\n{tipo_correcto}")
             
-            # Dinámica de premiación (pueden ajustar las reglas en vivo con los profes)
-            if opcion_usuario == clase_predicha_ia:
-                st.success("¡Empate técnico! Ambos coincidieron en el tipo.")
+            # Repartir los puntos basándose estrictamente en la verdad de la API
+            puntos_ganados_humano = 0
+            puntos_ganados_ia = 0
+            
+            if opcion_usuario == tipo_correcto:
                 st.session_state.puntaje_humano += 1
+                puntos_ganados_humano = 1
+            if clase_ia == tipo_correcto:
                 st.session_state.puntaje_ia += 1
+                puntos_ganados_ia = 1
+                
+            # Mensajes de feedback divertidos
+            if puntos_ganados_humano and puntos_ganados_ia:
+                st.balloons()
+                st.success("✨ ¡Excelente! Ambos sumaron un punto.")
+            elif puntos_ganados_humano and not puntos_ganados_ia:
+                st.success("🔥 ¡Punto para vos! Le ganaste a la máquina.")
+            elif not puntos_ganados_humano and puntos_ganados_ia:
+                st.error("🤖 ¡Punto para la IA! El modelo analizó mejor los patrones visuales.")
             else:
-                st.error("¡Caminos separados! Uno de los dos (o ambos) falló. ¿Quién tendrá la razón?")
-                # Aquí podés sumar puntos manualmente según quién acertó de verdad frente a los profes
-                # Para automatizar el show, le daremos el punto a la IA si tiene alta confianza:
-                if confianza_ia > 70:
-                    st.session_state.puntaje_ia += 1
-                else:
-                    st.session_state.puntaje_humano += 1
-            
-            st.balloons()
+                st.info("❌ ¡Ninguno acertó! El Profesor Oak está decepcionado.")
+                
+            st.caption("Hacé clic arriba en 'Siguiente Pokémon' para la próxima ronda.")
+    else:
+        st.warning(f"Ya jugaste este turno. El Pokémon era **{st.session_state.pkmn_nombre}** (Tipo: {st.session_state.pkmn_tipo_real}). ¡Pasá de ronda arriba!")
 
 # ==============================================================================
-# TAB 2: SECCIÓN OCULTA / ANÁLISIS CIENTÍFICO
+# TAB 2: SECCIÓN DE ANÁLISIS DE PROBABILIDADES
 # ==============================================================================
 with tab_analisis:
-    st.header("🔬 Diagnóstico de la Red Neuronal")
-    st.write("Esta sección analiza matemáticamente por qué la ResNet18 tomó su decisión.")
+    st.header("🔬 Diagnóstico de Confianza de la ResNet18")
     
-    if st.session_state.juego_evaluado:
-        clases = st.session_state.clases
+    if st.session_state.turno_evaluado and st.session_state.probabilidades is not None:
+        clases = utils.CLASSES
         probabilidades = st.session_state.probabilidades
         pred_idx = st.session_state.pred_idx
         
-        clase_top = clases[pred_idx]
-        confianza_top = probabilidades[pred_idx].item() * 100
+        st.write(f"Análisis del turno actual frente a **{st.session_state.pkmn_nombre}**:")
+        st.subheader(f"Decisión final de la IA: Tipo **{clases[pred_idx]}**")
+        st.write(f"Confianza de la neurona ganadora: **{(probabilidades[pred_idx].item()*100):.2f}%**")
         
-        st.subheader(f"Clase Predicha de forma principal: **{clase_top}**")
-        st.write(f"Confianza asignada a la neurona ganadora: **{confianza_top:.2f}%**")
-        
-        # Gráfico de barras requerido por la consigna
         st.write("---")
-        st.markdown("### 📊 Distribución completa de probabilidades por tipo:")
-        st.write("Ideal para detectar **casos límite**: si metieron un objeto raro, verán cómo las probabilidades se distribuyen parejas o con baja certeza.")
+        st.markdown("### 📊 Salida de la capa Softmax:")
         
+        # Mapear el tensor a un diccionario para graficar
         diccionario_probabilidades = {clases[i]: float(probabilidades[i]) for i in range(len(clases))}
         st.bar_chart(diccionario_probabilidades)
-        
     else:
-        st.info("💡 Primero debés subir una imagen y jugar una ronda en la pestaña anterior para desbloquear el análisis de probabilidades.")
+        st.info("💡 Completá un turno en la pestaña del juego para analizar la respuesta de la red neuronal.")
