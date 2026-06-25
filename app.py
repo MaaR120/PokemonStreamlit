@@ -433,7 +433,7 @@ with tab_analizador:
         <div class="hero" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.92));">
             <div class="section-label">Herramienta de Inferencia</div>
             <h1>Analizador de Pokémon</h1>
-            <p>Subí tu propia imagen de un Pokémon y mirá qué tipo predice la red neuronal (ResNet34) junto con sus probabilidades.</p>
+            <p>Subí una imagen o usá tu cámara para ver qué tipo de Pokémon predice la red neuronal (ResNet34) junto con sus probabilidades.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -443,14 +443,26 @@ with tab_analizador:
 
     with col_uploader:
         with st.container(border=True):
-            st.markdown('<div class="section-label">Subir archivo</div>', unsafe_allow_html=True)
-            st.subheader("Seleccioná tu imagen")
-            st.write("Formatos soportados: PNG, JPG, JPEG")
-            imagen_subida = st.file_uploader(
-                "Arrastrá y soltá una imagen aquí o hacé clic para buscar",
-                type=["png", "jpg", "jpeg"],
-                label_visibility="collapsed",
+            st.markdown('<div class="section-label">Entrada de imagen</div>', unsafe_allow_html=True)
+            metodo = st.radio(
+                "Seleccioná el método de entrada:",
+                ["Subir archivo", "Usar cámara"],
+                horizontal=True,
             )
+            
+            imagen_subida = None
+            if metodo == "Subir archivo":
+                st.write("Formatos soportados: PNG, JPG, JPEG")
+                imagen_subida = st.file_uploader(
+                    "Arrastrá y soltá una imagen aquí o hacé clic para buscar",
+                    type=["png", "jpg", "jpeg"],
+                    label_visibility="collapsed",
+                )
+            else:
+                imagen_subida = st.camera_input(
+                    "Tomar foto con tu cámara",
+                    label_visibility="collapsed",
+                )
 
     with col_previsualizacion:
         if imagen_subida is not None:
@@ -458,9 +470,9 @@ with tab_analizador:
             imagen_pil = Image.open(imagen_subida).convert("RGB")
             with st.container(border=True):
                 st.markdown('<div class="section-label">Previsualización</div>', unsafe_allow_html=True)
-                st.image(imagen_pil, caption="Imagen cargada por el usuario", use_container_width=True)
+                st.image(imagen_pil, caption="Imagen seleccionada", use_container_width=True)
         else:
-            st.info("Subí una imagen para ver la previsualización y el análisis de la IA.")
+            st.info("Subí una imagen o usá la cámara para ver la previsualización y el análisis de la IA.")
 
     if imagen_subida is not None:
         st.markdown("---")
