@@ -326,6 +326,7 @@ with st.form("lote_form"):
 if enviar:
     with st.spinner(f"Evaluando los {len(st.session_state.lote_pokemon)} Pokemon..."):
         evaluar_lote(st.session_state.lote_pokemon, st.session_state.lote_id)
+    st.rerun()
 
 if st.session_state.resultados_lote:
     resultados = st.session_state.resultados_lote
