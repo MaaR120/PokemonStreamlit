@@ -274,7 +274,6 @@ st.markdown(
 
 with st.form("lote_form"):
     lote = st.session_state.lote_pokemon
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
     st.markdown('<div class="section-label">Seleccion del lote</div>', unsafe_allow_html=True)
     st.subheader("Armá tus 20 respuestas")
     st.caption("Cada tarjeta tiene una imagen y tu predicción para ese Pokemon.")
@@ -298,7 +297,6 @@ with st.form("lote_form"):
                     )
 
     enviar = st.form_submit_button("Evaluar lote completo", use_container_width=True, type="primary")
-    st.markdown("</div>", unsafe_allow_html=True)
 
 if enviar:
     with st.spinner("Evaluando los 20 Pokemon..."):
@@ -317,7 +315,6 @@ if st.session_state.resultados_lote:
     elif aciertos_ia > aciertos_humano:
         ganador = "IA"
 
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
     st.markdown('<div class="section-label">Resultados</div>', unsafe_allow_html=True)
     st.markdown("## Resultados del lote")
     st.caption("Acá tenés el resumen general y, debajo, el detalle Pokemon por Pokemon con su gráfico.")
@@ -398,4 +395,3 @@ if st.session_state.resultados_lote:
 
             with col_grafico:
                 st.bar_chart(diccionario_probabilidades(resultado["probabilidades"], utils.CLASSES))
-    st.markdown("</div>", unsafe_allow_html=True)
