@@ -157,7 +157,7 @@ st.markdown(
     <div class="hero">
         <div class="section-label">Pokemon Streamlit Arena</div>
         <h1>Humano vs. IA: Desafio Pokemon</h1>
-        <p>Competí contra la ResNet18 con un lote de 20 Pokemon al mismo tiempo y revisá el análisis completo en una sola pantalla.</p>
+        <p>Competí contra la ResNet18 con un lote de Pokemon al mismo tiempo y revisá el análisis completo en una sola pantalla.</p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -178,6 +178,8 @@ if not carga_exitosa:
 
 
 def inicializar_estado():
+    if "num_pokemon" not in st.session_state:
+        st.session_state.num_pokemon = 20
     if "puntaje_humano" not in st.session_state:
         st.session_state.puntaje_humano = 0
     if "puntaje_ia" not in st.session_state:
@@ -185,14 +187,19 @@ def inicializar_estado():
     if "lote_id" not in st.session_state:
         st.session_state.lote_id = 1
     if "lote_pokemon" not in st.session_state:
-        st.session_state.lote_pokemon = utils.obtener_lote_pokemon(20)
+        st.session_state.lote_pokemon = utils.obtener_lote_pokemon(st.session_state.num_pokemon)
     if "resultados_lote" not in st.session_state:
         st.session_state.resultados_lote = None
 
 
+def cambiar_cantidad():
+    st.session_state.lote_pokemon = utils.obtener_lote_pokemon(st.session_state.num_pokemon)
+    st.session_state.resultados_lote = None
+
+
 def reiniciar_lote():
     st.session_state.lote_id += 1
-    st.session_state.lote_pokemon = utils.obtener_lote_pokemon(20)
+    st.session_state.lote_pokemon = utils.obtener_lote_pokemon(st.session_state.num_pokemon)
     st.session_state.resultados_lote = None
 
 
@@ -250,21 +257,33 @@ def evaluar_lote(lote, lote_id):
 
 inicializar_estado()
 
-col_score1, col_score2, col_accion = st.columns([1, 1, 1.2])
+col_score1, col_score2, col_cant, col_accion = st.columns([1, 1, 1.5, 1.5])
 with col_score1:
     st.metric("Tu puntaje", st.session_state.puntaje_humano)
 with col_score2:
     st.metric("Puntaje IA", st.session_state.puntaje_ia)
+with col_cant:
+    st.slider(
+        "Cantidad de Pokemon",
+        min_value=5,
+        max_value=20,
+        key="num_pokemon",
+        on_change=cambiar_cantidad,
+    )
 with col_accion:
     st.write("")
-    st.button("Generar 20 Pokemon nuevos", use_container_width=True, on_click=reiniciar_lote)
+    st.button(
+        f"Generar {st.session_state.num_pokemon} Pokemon nuevos",
+        use_container_width=True,
+        on_click=reiniciar_lote,
+    )
 
 st.markdown(
     """
     <div class="panel">
         <div class="section-label">Modo de juego</div>
         <p style="margin:0;color:var(--muted);font-size:1rem;">
-            Elegí un tipo para cada uno de los 20 Pokemon y luego evaluá el lote. Los resultados quedan ordenados por sorpresa:
+            Elegí un tipo para cada uno de los Pokemon y luego evaluá el lote. Los resultados quedan ordenados por sorpresa:
             primero los casos donde nadie acertó o hubo desacuerdo, y después los aciertos limpios.
         </p>
     </div>
@@ -275,7 +294,7 @@ st.markdown(
 with st.form("lote_form"):
     lote = st.session_state.lote_pokemon
     st.markdown('<div class="section-label">Seleccion del lote</div>', unsafe_allow_html=True)
-    st.subheader("Armá tus 20 respuestas")
+    st.subheader(f"Armá tus {len(lote)} respuestas")
     st.caption("Cada tarjeta tiene una imagen y tu predicción para ese Pokemon.")
 
     for fila_inicio in range(0, len(lote), 4):
@@ -294,12 +313,18 @@ with st.form("lote_form"):
                         "Tu tipo",
                         utils.CLASSES,
                         key=f"guess_{st.session_state.lote_id}_{idx}",
+                        disabled=(st.session_state.resultados_lote is not None),
                     )
 
-    enviar = st.form_submit_button("Evaluar lote completo", use_container_width=True, type="primary")
+    enviar = st.form_submit_button(
+        "Evaluar lote completo",
+        use_container_width=True,
+        type="primary",
+        disabled=(st.session_state.resultados_lote is not None),
+    )
 
 if enviar:
-    with st.spinner("Evaluando los 20 Pokemon..."):
+    with st.spinner(f"Evaluando los {len(st.session_state.lote_pokemon)} Pokemon..."):
         evaluar_lote(st.session_state.lote_pokemon, st.session_state.lote_id)
 
 if st.session_state.resultados_lote:
