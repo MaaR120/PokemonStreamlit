@@ -45,7 +45,7 @@ def obtener_transformacion():
 
 
 def cargar_modelo_ganador(ruta_pesos):
-    model = models.resnet18(weights=None)
+    model = models.resnet34(weights=None)
     num_features = model.fc.in_features
     model.fc = nn.Linear(num_features, len(CLASSES))
 
